@@ -47,7 +47,7 @@ La primera vez descarga el CSV (~270 MB) a `data/`. Después lo reutiliza.
 
 ## Fuentes de datos
 
-### 1. Secretaría de Turismo — Conectividad Aérea (EN USO, falta la aprobación de Julia: consulta enviada)
+### 1. Secretaría de Turismo — Conectividad Aérea (EN USO, APROBADA por Julia)
 
 - Dataset: https://datos.yvera.gob.ar/dataset/conectividad-aerea
 - Archivo: `base_microdatos.csv` ("Base agregada de frecuencias aéreas")
@@ -137,7 +137,7 @@ docs/                  # consigna, guía de estilo, logo
 
 ## Próximos pasos
 
-1. Esperar el OK de Julia para la base de Turismo (la de ANAC ya está aprobada). Si no la aprueba, el Load Factor no se puede calcular (ANAC no trae asientos) y hay que replantear las secciones 2 a 4.
+1. Ambas fuentes aprobadas por Julia (ANAC y Turismo). Se avanza por etapas de la consigna, de a un paso, explicando cada uno.
 2. Gráficos con matplotlib: evolución anual de pasajeros y LF, estacionalidad mensual, ranking de rutas por LF, matriz volumen vs LF (para detectar rutas candidatas a más frecuencias).
 3. KPIs finales y conclusiones de negocio.
 4. Armar el .zip de entrega.
