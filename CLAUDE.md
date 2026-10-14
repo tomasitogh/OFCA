@@ -8,9 +8,11 @@ Trabajo Práctico Obligatorio (TPO) de **Taller de Programación II — UADE**.
 Grupo 10: Luciana Pirruccio, Agostina Pacheco, Sebastián Gómez Martínez. Profesora: María Julia Monasterio.
 
 Marca ficticia del proyecto: **OFCA — Observatorio Federal de Conectividad Aérea** (Secretaría de Turismo, República Argentina).
-Eslogan: *"Todo el país, más cerca"*.
+Eslogan: _"Todo el país, más cerca"_.
 
 **Tema:** análisis estadístico de la demanda histórica y del factor de ocupación (Load Factor) en las rutas aéreas de **cabotaje** de Argentina, para identificar cuellos de botella operativos y evaluar la viabilidad de sumar frecuencias en ciertas rutas o aeropuertos.
+
+**ACLARACIÓN**: Cada fuente utilizada para este trabajo debe tener la aprobación de Julia, la profesora. Si hace falta una nueva fuente de datos, deberás armar un mensaje para justificar con Julia si esa fuente de datos nos sirve y qué problema nos soluciona.
 
 **Período:** 2020 a 2026 (2026 llega hasta julio).
 
@@ -19,7 +21,7 @@ Eslogan: *"Todo el país, más cerca"*.
 Son estudiantes que están aprendiendo Python, pandas y matplotlib. Por eso:
 
 - **Código simple y didáctico.** Nada de clases, decoradores, type hints complejos ni abstracciones innecesarias. Funciones cortas, nombres claros.
-- **Comentarios en español** que expliquen el *porqué* de cada paso (la consigna los evalúa).
+- **Comentarios en español** que expliquen el _porqué_ de cada paso (la consigna los evalúa).
 - **Explicar cada cambio** en la respuesta: qué se hizo y por qué, en lenguaje simple.
 - **Ante una decisión de análisis dudosa, preguntar antes** de implementarla.
 - Todo en **español** (código, comentarios, nombres de variables, mensajes por consola).
@@ -46,6 +48,7 @@ La primera vez descarga el CSV (~270 MB) a `data/`. Después lo reutiliza.
 ## Fuentes de datos
 
 ### 1. Secretaría de Turismo — Conectividad Aérea (EN USO)
+
 - Dataset: https://datos.yvera.gob.ar/dataset/conectividad-aerea
 - Archivo: `base_microdatos.csv` ("Base agregada de frecuencias aéreas")
   https://datos.yvera.gob.ar/dataset/c0e7bc3d-553c-405c-8b32-79282b28ffd5/resource/aab49234-28c9-48ab-a978-a83485139290/download/base_microdatos.csv
@@ -56,6 +59,7 @@ La primera vez descarga el CSV (~270 MB) a `data/`. Después lo reutiliza.
 - Advertencia: Turismo filtró vuelos desde/hacia aeropuertos "sin relevancia turística" (ver `novedades.csv` del dataset). Algunos aeropuertos chicos pueden faltar. Mencionarlo en el informe.
 
 ### 2. ANAC — Aterrizajes y despegues procesados (PENDIENTE, decisión abierta)
+
 - https://datos.gob.ar/dataset/aterrizajes-y-despegues-procesados-por-la-administracion-nacional-de-aviacion-civil-anac
 - Un CSV por año (2019 a 2026). Trae **hora** y aeropuerto de cada movimiento, pasajeros, aeronave, aerolínea. **No trae asientos.**
 - Uso posible: horarios pico por aeropuerto (cuellos de botella operativos), que la base de Turismo no permite (solo tiene fecha).
@@ -94,12 +98,12 @@ La primera vez descarga el CSV (~270 MB) a `data/`. Después lo reutiliza.
 
 Paleta oficial (de la guía de estilo):
 
-| Uso sugerido | Hex |
-|---|---|
-| Amarillo (acento, destacar un valor) | `#F2D565` |
-| Celeste (serie principal) | `#7BB6D1` |
+| Uso sugerido                               | Hex       |
+| ------------------------------------------ | --------- |
+| Amarillo (acento, destacar un valor)       | `#F2D565` |
+| Celeste (serie principal)                  | `#7BB6D1` |
 | Gris azulado (series secundarias, grillas) | `#93AAB5` |
-| Gris oscuro (texto, ejes) | `#272F33` |
+| Gris oscuro (texto, ejes)                  | `#272F33` |
 
 Colores del logo (complementarios): azul marino `#14284B` (títulos, serie fuerte), azul acero `#527D9B`, celeste muy claro `#E7F2F7` (fondos).
 
