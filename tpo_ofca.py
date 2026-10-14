@@ -9,8 +9,11 @@
 # aéreas de cabotaje de Argentina (2020-2026), para detectar cuellos de
 # botella y evaluar dónde conviene sumar frecuencias.
 #
-# Fuente: Secretaría de Turismo - Conectividad Aérea (datos de la ANAC / SIAC)
-# https://datos.yvera.gob.ar/dataset/conectividad-aerea
+# Fuentes:
+# 1) Secretaría de Turismo - Conectividad Aérea (datos de la ANAC / SIAC)
+#    https://datos.yvera.gob.ar/dataset/conectividad-aerea
+# 2) ANAC - Aterrizajes y despegues procesados (un CSV por año)
+#    https://datos.gob.ar/dataset/aterrizajes-y-despegues-procesados-por-la-administracion-nacional-de-aviacion-civil-anac
 # ============================================================
 import os
 import requests
@@ -19,6 +22,8 @@ import matplotlib
 matplotlib.use("Agg")   # genera los PNG sin abrir ventanas (sirve en cualquier compu)
 import matplotlib.pyplot as plt
 from matplotlib import font_manager
+from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.patches import Patch
 
 # ------------------------------------------------------------
 # CONFIGURACIÓN
@@ -375,3 +380,360 @@ print(candidatas.sort_values("pasajeros", ascending=False))
 # Conclusión parcial: las candidatas combinan mucho tráfico y LF ≥ 88%.
 # Son rutas donde la demanda ya está cerca del techo de la oferta actual:
 # sumar frecuencias ahí tiene menos riesgo de que los vuelos salgan vacíos.
+
+
+# ============================================================
+# 5. SEGUNDA FUENTE: ANAC - ATERRIZAJES Y DESPEGUES
+# https://datos.gob.ar/dataset/aterrizajes-y-despegues-procesados-por-la-administracion-nacional-de-aviacion-civil-anac
+#
+# ¿Para qué la sumamos? La base de Turismo tiene asientos (sirve para el
+# Load Factor) pero no tiene la HORA de los vuelos. La de ANAC registra cada
+# aterrizaje y despegue con su hora y sus pasajeros. Con eso podemos ver:
+#   - cuántos pasajeros recibe cada aeropuerto por vuelo,
+#   - en qué horas se concentran los vuelos (cuellos de botella).
+# ============================================================
+CARPETA_ANAC = os.path.join(CARPETA_DATA, "anac")
+os.makedirs(CARPETA_ANAC, exist_ok=True)
+
+ANIOS_ANAC = [2020, 2021, 2022, 2023, 2024, 2025, 2026]
+
+# El portal de Transporte (donde están guardados los archivos) tiene una API
+# que devuelve la lista de archivos del dataset con sus links de descarga.
+# La usamos porque el nombre del archivo de cada año cambia cuando ANAC lo actualiza.
+URL_API_ANAC = ("https://datos.transporte.gob.ar/api/3/action/package_show"
+                "?id=21038a1a-c3c7-4494-b76a-3a2a8fbb83b5")
+
+
+# ------------------------------------------------------------
+# 5.1 EXTRACCIÓN
+# ------------------------------------------------------------
+def buscar_urls_anac():
+    """Le pregunta a la API del portal qué archivos tiene el dataset y
+    devuelve un diccionario {año: link de descarga del CSV}."""
+    resp = requests.get(URL_API_ANAC, timeout=60)
+    resp.raise_for_status()
+    recursos = resp.json()["result"]["resources"]
+
+    urls = {}
+    for recurso in recursos:
+        texto = (recurso.get("name", "") + " " + recurso.get("url", "")).lower()
+        if not recurso.get("url", "").lower().endswith(".csv"):
+            continue   # solo nos interesan los CSV
+        for anio in ANIOS_ANAC:
+            if str(anio) in texto and anio not in urls:
+                urls[anio] = recurso["url"]
+    return urls
+
+
+def descargar_anac():
+    """Descarga un CSV por año a data/anac/. Si ya están, no hace nada."""
+    faltantes = [a for a in ANIOS_ANAC
+                 if not os.path.exists(os.path.join(CARPETA_ANAC, f"anac_{a}.csv"))]
+    if not faltantes:
+        print("Los CSV de ANAC ya están descargados.")
+        return
+
+    # Si el portal no responde, el script sigue con los años que ya estén descargados
+    try:
+        urls = buscar_urls_anac()
+    except requests.exceptions.RequestException as error:
+        print("No se pudo consultar el portal de ANAC:", error)
+        urls = {}
+
+    for anio in faltantes:
+        if anio not in urls:
+            print(f"No se encontró el CSV de ANAC {anio} en el portal. "
+                  f"Descargarlo a mano y guardarlo como data/anac/anac_{anio}.csv")
+            continue
+        print(f"ANAC {anio}: {urls[anio]}")
+        descargar_csv(urls[anio], os.path.join(CARPETA_ANAC, f"anac_{anio}.csv"))
+
+
+descargar_anac()
+
+
+# ------------------------------------------------------------
+# 5.2 LECTURA, VALIDACIÓN Y LIMPIEZA
+# Los archivos de ANAC vienen con separador ";" y la coma como decimal
+# (ej: "167,00"). Además, los nombres de las columnas cambian un poco
+# entre años, así que los pasamos a nombres fijos antes de unirlos.
+# ------------------------------------------------------------
+def nombre_estandar(columna):
+    """Traduce el nombre de una columna de ANAC a un nombre corto y fijo."""
+    col = columna.strip().lower()
+    if col.startswith("fecha"):
+        return "fecha"
+    if col.startswith("hora"):
+        return "hora_utc"
+    if col.startswith("clase de vuelo"):
+        return "clase_vuelo"
+    if col.startswith("clasificaci"):
+        return "clasificacion_vuelo"
+    if col.startswith("tipo de movimiento"):
+        return "movimiento"
+    if col == "aeropuerto":
+        return "aeropuerto"
+    if col.startswith("origen"):
+        return "origen_destino"
+    if col == "pasajeros":
+        return "pasajeros"
+    return col   # las demás columnas no las usamos
+
+
+COLUMNAS_ANAC = ["fecha", "hora_utc", "clase_vuelo", "clasificacion_vuelo",
+                 "movimiento", "aeropuerto", "origen_destino", "pasajeros"]
+
+
+def leer_anac(anio):
+    """Lee el CSV de un año y devuelve solo las columnas que usamos."""
+    ruta = os.path.join(CARPETA_ANAC, f"anac_{anio}.csv")
+    try:
+        datos = pd.read_csv(ruta, sep=";", decimal=",", low_memory=False)
+    except UnicodeDecodeError:
+        datos = pd.read_csv(ruta, sep=";", decimal=",", encoding="latin-1", low_memory=False)
+
+    datos.columns = [nombre_estandar(c) for c in datos.columns]
+    faltan = [c for c in COLUMNAS_ANAC if c not in datos.columns]
+    if faltan:
+        print(f"ANAC {anio}: faltan las columnas {faltan}. Revisar el archivo.")
+        return None
+    print(f"ANAC {anio}: {len(datos):,} filas".replace(",", "."))
+    return datos[COLUMNAS_ANAC]
+
+
+anuales = [leer_anac(a) for a in ANIOS_ANAC
+           if os.path.exists(os.path.join(CARPETA_ANAC, f"anac_{a}.csv"))]
+anac = pd.concat([d for d in anuales if d is not None], ignore_index=True)
+print("ANAC - filas totales:", len(anac))
+
+# Solo vuelos de cabotaje (ANAC los llama "Doméstico") y regulares,
+# igual que hicimos con la base de Turismo.
+anac = anac[anac["clasificacion_vuelo"].isin(["Doméstico", "Cabotaje"])]
+anac = anac[anac["clase_vuelo"] == "Regular"].copy()
+
+# La hora viene en UTC. Argentina es UTC-3, así que restamos 3 horas
+# (si no, el "pico de las 10" sería en realidad a las 7 de la mañana).
+anac["pasajeros"] = pd.to_numeric(anac["pasajeros"], errors="coerce")
+hora = pd.to_numeric(anac["hora_utc"].astype(str).str.split(":").str[0], errors="coerce")
+fecha = pd.to_datetime(anac["fecha"], dayfirst=True, format="mixed", errors="coerce")
+anac["fecha_hora"] = fecha + pd.to_timedelta(hora, unit="h") - pd.Timedelta(hours=3)
+
+# Controles de calidad
+print("ANAC - fechas u horas que no se pudieron leer:", anac["fecha_hora"].isna().sum())
+print("ANAC - filas sin pasajeros informados:", anac["pasajeros"].isna().sum())
+print("ANAC - vuelos regulares con 0 pasajeros:", (anac["pasajeros"] == 0).sum())
+
+# Sacamos filas inválidas. Los vuelos regulares con 0 pasajeros son pocos
+# (~1%) y suelen ser datos sin cargar: si los dejamos, bajan el promedio
+# de pasajeros por vuelo sin que eso refleje la demanda real.
+anac = anac.dropna(subset=["fecha_hora", "pasajeros"])
+anac = anac[anac["pasajeros"] > 0]
+
+anac["anio"] = anac["fecha_hora"].dt.year
+anac["hora"] = anac["fecha_hora"].dt.hour
+# Por la resta de 3 horas, los vuelos de la madrugada del 1/1 caen en el
+# año anterior: nos quedamos solo con el período de análisis.
+anac = anac[anac["anio"].isin(ANIOS_ANAC)]
+print("ANAC - filas después de limpiar:", len(anac))
+
+# Control cruzado con la base de Turismo: cada vuelo aparece dos veces en ANAC
+# (despegue en el origen y aterrizaje en el destino), así que para contar
+# pasajeros del país hay que mirar un solo tipo de movimiento.
+control = anac[anac["movimiento"] == "Despegue"].groupby("anio")["pasajeros"].sum() / 1e6
+print("\n=== Control: pasajeros (millones) según ANAC vs Turismo ===")
+print(pd.DataFrame({"ANAC": control.round(1), "Turismo": (lf_anual["pasajeros"] / 1e6).round(1)}))
+# En 2025 dan 17,2 M en las dos bases: las dos fuentes son coherentes.
+
+
+# ------------------------------------------------------------
+# 5.3 ANÁLISIS POR AEROPUERTO
+# ANAC usa códigos propios de 3 letras. Este diccionario les pone nombre
+# y los une con el código internacional (OACI) que usa la base de Turismo.
+# ------------------------------------------------------------
+AEROPUERTOS = {
+    # código ANAC: (nombre para los gráficos, código OACI)
+    "AER": ("Aeroparque (CABA)", "SABE"),
+    "EZE": ("Ezeiza", "SAEZ"),
+    "CBA": ("Córdoba", "SACO"),
+    "DOZ": ("Mendoza", "SAME"),
+    "BAR": ("Bariloche", "SAZS"),
+    "IGU": ("Puerto Iguazú", "SARI"),
+    "NEU": ("Neuquén", "SAZN"),
+    "SAL": ("Salta", "SASA"),
+    "USU": ("Ushuaia", "SAWH"),
+    "TUC": ("Tucumán", "SANT"),
+    "ECA": ("El Calafate", "SAWC"),
+    "CRV": ("Comodoro Rivadavia", "SAVC"),
+    "JUJ": ("Jujuy", "SASJ"),
+    "MDP": ("Mar del Plata", "SAZM"),
+    "POS": ("Posadas", "SARP"),
+    "TRE": ("Trelew", "SAVT"),
+    "BCA": ("Bahía Blanca", "SAZB"),
+    "CHP": ("San Martín de los Andes", "SAZY"),
+    "SIS": ("Resistencia", "SARE"),
+    "ROS": ("Rosario", "SAAR"),
+    "JUA": ("San Juan", "SANU"),
+    "SDE": ("Santiago del Estero", "SANE"),
+    "CRR": ("Corrientes", "SARC"),
+    "GAL": ("Río Gallegos", "SAWG"),
+    "DRY": ("Puerto Madryn", "SAVY"),
+    "SVO": ("Santa Fe", "SAAV"),
+    "CAT": ("Catamarca", "SANC"),
+    "GRA": ("Río Grande", "SAWE"),
+    "LAR": ("La Rioja", "SANL"),
+    "FSA": ("Formosa", "SARF"),
+    "ESQ": ("Esquel", "SAVE"),
+    "UIS": ("San Luis", "SAOU"),
+    "SRA": ("San Rafael", "SAMR"),
+    "PAR": ("Paraná", "SAAP"),
+    "OSA": ("Santa Rosa", "SAZR"),
+    "VIE": ("Viedma", "SAVV"),
+    "TRH": ("Termas de Río Hondo", "SANR"),
+    "TRC": ("Río Cuarto", "SAOC"),
+}
+
+
+def nombre_aeropuerto(codigo):
+    """Devuelve el nombre del aeropuerto; si no está en el diccionario, el código."""
+    return AEROPUERTOS.get(codigo, (codigo, None))[0]
+
+
+# Pasajeros por vuelo en cada aeropuerto (2025, último año completo).
+# Cada fila de ANAC es un vuelo que aterriza o despega en ese aeropuerto,
+# así que acá sí sumamos los dos tipos de movimiento.
+anac_2025 = anac[anac["anio"] == 2025]
+por_aeropuerto = anac_2025.groupby("aeropuerto").agg(
+    vuelos=("pasajeros", "size"),
+    pasajeros=("pasajeros", "sum"))
+por_aeropuerto["pax_por_vuelo"] = (por_aeropuerto["pasajeros"] / por_aeropuerto["vuelos"]).round(1)
+por_aeropuerto = por_aeropuerto[por_aeropuerto["vuelos"] >= MIN_VUELOS]
+
+# Load Factor de cada aeropuerto según Turismo (2025): se suman los vuelos
+# que salen y los que llegan, y recién después se divide.
+salidas = df_2025.groupby("origen_oaci")[["pasajeros", "asientos"]].sum()
+llegadas = df_2025.groupby("destino_oaci")[["pasajeros", "asientos"]].sum()
+lf_aeropuerto = calcular_lf(salidas.add(llegadas, fill_value=0))
+
+# Unimos las dos fuentes con el código OACI
+por_aeropuerto["nombre"] = [nombre_aeropuerto(c) for c in por_aeropuerto.index]
+por_aeropuerto["oaci"] = [AEROPUERTOS.get(c, (c, None))[1] for c in por_aeropuerto.index]
+por_aeropuerto["load_factor"] = por_aeropuerto["oaci"].map(lf_aeropuerto["load_factor"])
+por_aeropuerto = por_aeropuerto.sort_values("pax_por_vuelo", ascending=False)
+
+print("\n=== Aeropuertos: pasajeros por vuelo (ANAC) y Load Factor (Turismo), 2025 ===")
+print(por_aeropuerto[["nombre", "vuelos", "pasajeros", "pax_por_vuelo", "load_factor"]])
+sin_lf = por_aeropuerto[por_aeropuerto["load_factor"].isna()]
+if len(sin_lf) > 0:
+    print("Aeropuertos sin Load Factor (no se pudieron unir con Turismo):", list(sin_lf["nombre"]))
+
+# Evolución de pasajeros por vuelo 2020-2026 en los 10 aeropuertos con más vuelos
+top10 = por_aeropuerto.sort_values("vuelos", ascending=False).head(10).index
+evolucion = anac[anac["aeropuerto"].isin(top10)].groupby(["aeropuerto", "anio"])["pasajeros"].mean()
+evolucion = evolucion.round(0).unstack("anio")
+evolucion.index = [nombre_aeropuerto(c) for c in evolucion.index]
+print("\n=== Pasajeros por vuelo por año (10 aeropuertos con más vuelos) ===")
+print(evolucion)
+
+# OJO al interpretar: ANAC no trae asientos. Un aeropuerto puede tener más
+# pasajeros por vuelo solo porque llegan aviones más grandes. Por eso lo
+# miramos JUNTO con el Load Factor de Turismo: muchos pasajeros por vuelo +
+# LF alto = aviones grandes y llenos, la demanda no entra en la oferta actual.
+# Conclusión parcial: Bariloche, Iguazú, Ushuaia, Puerto Madryn y San Martín
+# de los Andes reciben más pasajeros por vuelo que Aeroparque (158, 148, 147,
+# 145 y 144 contra 133). Son destinos turísticos donde cada vuelo trae mucha
+# gente. En 2026 Bariloche sube a 168 pasajeros por vuelo.
+
+
+# ------------------------------------------------------------
+# 5.4 CUELLOS DE BOTELLA: ¿A QUÉ HORA SE CONCENTRAN LOS VUELOS?
+# Promedio de vuelos (aterrizajes + despegues) por hora del día en 2025.
+# ------------------------------------------------------------
+dias_2025 = anac_2025["fecha_hora"].dt.date.nunique()
+por_hora = anac_2025[anac_2025["aeropuerto"].isin(top10)].groupby(["aeropuerto", "hora"]).size()
+por_hora = (por_hora / dias_2025).unstack("hora", fill_value=0)
+por_hora = por_hora.reindex(columns=range(24), fill_value=0)   # las 24 horas, aunque alguna no tenga vuelos
+por_hora = por_hora.loc[top10]                                  # ordenados de más a menos vuelos
+por_hora.index = [nombre_aeropuerto(c) for c in por_hora.index]
+
+hora_pico = pd.DataFrame({
+    "hora_pico": por_hora.idxmax(axis=1),
+    "vuelos_en_hora_pico": por_hora.max(axis=1).round(1),
+    "vuelos_por_dia": por_hora.sum(axis=1).round(1),
+})
+print("\n=== Hora pico por aeropuerto (2025, hora argentina) ===")
+print(hora_pico)
+# Conclusión parcial: Aeroparque es el gran cuello de botella del país:
+# 257 vuelos de cabotaje por día y entre 13 y 16,5 por hora desde las 9 hasta
+# las 20 (un vuelo cada 4 minutos en la hora pico). Ahí es difícil sumar
+# frecuencias en horario central. Ezeiza, en cambio, tiene picos chicos
+# (5 vuelos/hora a las 7 y a las 20): tiene lugar para absorber vuelos nuevos.
+# En el interior los vuelos se amontonan a la mañana: Bariloche, Iguazú,
+# Salta y Ushuaia tienen su pico entre las 8 y las 11.
+
+
+# ------------------------------------------------------------
+# 5.5 GRÁFICOS DE AEROPUERTOS
+# ------------------------------------------------------------
+FUENTE_DATOS = ("Fuente: ANAC - Aterrizajes y despegues procesados (datos.gob.ar) / "
+                "Secretaría de Turismo (datos.yvera.gob.ar)")
+
+# Gráfico 6: pasajeros por vuelo, 15 aeropuertos con más pasajeros por vuelo.
+# En azul marino los que además tienen LF alto en Turismo (candidatos).
+top_ppv = por_aeropuerto.head(15).sort_values("pax_por_vuelo")
+lf_alto = top_ppv["load_factor"] >= LF_ALTO
+colores = [AZUL_MARINO if alto else CELESTE for alto in lf_alto]
+
+fig, ax = plt.subplots(figsize=(10, 7))
+ax.barh(top_ppv["nombre"], top_ppv["pax_por_vuelo"], color=colores, height=0.65)
+for y, ppv, lf in zip(top_ppv["nombre"], top_ppv["pax_por_vuelo"], top_ppv["load_factor"]):
+    texto = f"{ppv:.0f}" if pd.isna(lf) else f"{ppv:.0f}  (LF {lf:.1f}%)".replace(".", ",")
+    ax.text(ppv + 1, y, texto, va="center", fontsize=9)
+
+# Leyenda armada a mano (con "Patch"), porque las barras usan dos colores.
+# Va arriba del gráfico para no tapar ninguna barra.
+ax.legend(handles=[Patch(color=AZUL_MARINO, label=f"Load Factor ≥ {LF_ALTO}% (candidatos)"),
+                   Patch(color=CELESTE, label=f"Load Factor < {LF_ALTO}%")],
+          loc="lower left", bbox_to_anchor=(0, 1.0), ncol=2, frameon=False)
+
+ax.set_xlim(0, top_ppv["pax_por_vuelo"].max() * 1.25)
+ax.set_title("Los destinos turísticos reciben los vuelos más cargados (2025)",
+             fontsize=13, fontweight="bold", color=AZUL_MARINO, loc="left", pad=32)
+ax.set_xlabel("Pasajeros promedio por vuelo (aterrizajes + despegues)")
+ax.grid(axis="y", visible=False)
+guardar_grafico(fig, "06_pasajeros_por_vuelo_aeropuertos.png")
+
+
+# Gráfico 7: mapa de calor de vuelos por hora (cuellos de botella).
+# Mostramos qué % de los vuelos del día cae en cada hora. Si usáramos la
+# cantidad de vuelos, Aeroparque (257 por día) taparía a todos los demás y
+# no se vería la hora pico de cada aeropuerto.
+porcentaje_hora = por_hora.div(por_hora.sum(axis=1), axis=0) * 100
+
+# Escala de un solo color, de celeste muy claro (pocos vuelos) a azul marino (muchos).
+escala_ofca = LinearSegmentedColormap.from_list("ofca", ["#E7F2F7", CELESTE, AZUL_MARINO])
+
+fig, ax = plt.subplots(figsize=(12, 5.5))
+imagen = ax.imshow(porcentaje_hora, aspect="auto", cmap=escala_ofca)
+
+# Escribimos el valor solo en la hora pico de cada aeropuerto
+for fila, aeropuerto in enumerate(porcentaje_hora.index):
+    hora_max = porcentaje_hora.loc[aeropuerto].idxmax()
+    valor = porcentaje_hora.loc[aeropuerto, hora_max]
+    ax.text(hora_max, fila, f"{valor:.0f}%", ha="center", va="center",
+            fontsize=8, color="white", fontweight="bold")
+ax.set_xticks(range(24))
+ax.set_xticklabels([f"{h}h" for h in range(24)], fontsize=8)
+ax.set_yticks(range(len(por_hora)))
+ax.set_yticklabels(por_hora.index)
+ax.grid(False)   # en un mapa de calor la grilla tapa los colores
+for borde in ["left", "bottom"]:
+    ax.spines[borde].set_visible(False)
+
+barra = fig.colorbar(imagen, ax=ax)
+barra.set_label("% de los vuelos del día")
+barra.outline.set_visible(False)
+
+ax.set_title("¿A qué hora se congestionan los aeropuertos? % de vuelos del día por hora (2025)",
+             fontsize=13, fontweight="bold", color=AZUL_MARINO, loc="left")
+ax.set_xlabel("Hora del día (hora argentina)")
+guardar_grafico(fig, "07_vuelos_por_hora_aeropuertos.png")

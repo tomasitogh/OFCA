@@ -28,7 +28,7 @@ Un Load Factor alto y sostenido en una ruta con mucho tráfico indica que la dem
 | Fuente | Qué usamos | Link |
 |---|---|---|
 | Secretaría de Turismo — Conectividad Aérea (datos de la ANAC) | Vuelos, pasajeros y asientos por día, ruta y aerolínea | [datos.yvera.gob.ar](https://datos.yvera.gob.ar/dataset/conectividad-aerea) |
-| ANAC — Aterrizajes y despegues procesados | Horarios de vuelo por aeropuerto *(en evaluación)* | [datos.gob.ar](https://datos.gob.ar/dataset/aterrizajes-y-despegues-procesados-por-la-administracion-nacional-de-aviacion-civil-anac) |
+| ANAC — Aterrizajes y despegues procesados | Pasajeros por vuelo y horarios pico por aeropuerto (2020–2026) | [datos.gob.ar](https://datos.gob.ar/dataset/aterrizajes-y-despegues-procesados-por-la-administracion-nacional-de-aviacion-civil-anac) |
 
 Los datos son abiertos (licencia CC-BY-4.0).
 
@@ -52,7 +52,7 @@ pip install -r requirements.txt
 python tpo_ofca.py
 ```
 
-La primera vez, el script **descarga automáticamente** los datos (~270 MB) a la carpeta `data/`. Las siguientes veces usa el archivo ya descargado.
+La primera vez, el script **descarga automáticamente** los datos (~270 MB de Turismo + un CSV por año de ANAC) a la carpeta `data/`. Las siguientes veces usa el archivo ya descargado.
 
 > **Mac y error de certificados SSL** (`CERTIFICATE_VERIFY_FAILED`): si instalaste Python desde python.org, ejecutá una vez *Aplicaciones → Python 3.x → Install Certificates.command*.
 

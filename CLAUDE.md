@@ -58,11 +58,15 @@ La primera vez descarga el CSV (~270 MB) a `data/`. Después lo reutiliza.
 - **Por qué esta y no la de ANAC:** es la única que trae `asientos`, necesarios para el Load Factor.
 - Advertencia: Turismo filtró vuelos desde/hacia aeropuertos "sin relevancia turística" (ver `novedades.csv` del dataset). Algunos aeropuertos chicos pueden faltar. Mencionarlo en el informe.
 
-### 2. ANAC — Aterrizajes y despegues procesados (PENDIENTE, decisión abierta)
+### 2. ANAC — Aterrizajes y despegues procesados (EN USO desde oct-2026, falta confirmar aprobación de Julia)
 
 - https://datos.gob.ar/dataset/aterrizajes-y-despegues-procesados-por-la-administracion-nacional-de-aviacion-civil-anac
 - Un CSV por año (2019 a 2026). Trae **hora** y aeropuerto de cada movimiento, pasajeros, aeronave, aerolínea. **No trae asientos.**
-- Uso posible: horarios pico por aeropuerto (cuellos de botella operativos), que la base de Turismo no permite (solo tiene fecha).
+- Uso: pasajeros por vuelo en cada aeropuerto y horarios pico (cuellos de botella), que la base de Turismo no permite (solo tiene fecha).
+- Formato verificado (2023-2026): separador `;`, UTF-8, decimales con coma (`167,00`), fecha `dd/mm/aaaa`, **hora en UTC** (se restan 3 h para hora argentina). Columnas: `Fecha UTC`, `Hora UTC`, `Clase de Vuelo (todos los vuelos)`, `Clasificación Vuelo` (Doméstico / Internacional), `Tipo de Movimiento`, `Aeropuerto`, `Origen / Destino`, `Aerolinea Nombre`, `Aeronave`, (`Matrícula` solo en 2026), `Pasajeros`, `PAX`, `Calidad dato`. `PAX` es `Pasajeros` dividido 2 en vuelos domésticos; usamos `Pasajeros`.
+- Aeropuertos con códigos propios de ANAC (AER = Aeroparque, BAR = Bariloche...). El diccionario `AEROPUERTOS` del script los traduce a nombre y a código OACI para unir con Turismo.
+- El script baja los CSV solo, usando la API del portal (`datos.transporte.gob.ar/api/3/action/package_show`), a `data/anac/anac_<año>.csv`. Si falla, se pueden bajar a mano con ese nombre. **No abrir y guardar con Excel** (cambia el formato).
+- Control: en 2025 los despegues de cabotaje regular suman 17,2 M de pasajeros, igual que Turismo.
 - Cuidados si se usa: probablemente separador `;` y posible encoding `latin-1`; **cada vuelo de cabotaje aparece dos veces** (despegue en origen + aterrizaje en destino), así que para totales hay que filtrar un solo tipo de movimiento; los nombres de columnas pueden variar entre años (verificar `df.columns` de cada archivo antes de concatenar).
 - Los links de datos.gob.ar apuntan a la página del recurso; la URL de descarga directa está en el botón "Descargar" de cada año (la de 2026 es `https://datos.transporte.gob.ar/dataset/21038a1a-c3c7-4494-b76a-3a2a8fbb83b5/resource/7b6d0103-0a69-4c67-aed9-33cb58ae12f5/download/202608-informe-ministerio_modificado.csv`).
 
@@ -93,6 +97,9 @@ La primera vez descarga el CSV (~270 MB) a `data/`. Después lo reutiliza.
 - Rutas con mayor LF en 2025 (≥300 vuelos): El Calafate → CABA 89,4%, CABA → Salta 88,8%, CABA → El Calafate 88,4%, CABA → Puerto Iguazú 88,2%, CABA → Tucumán 88,1%, Bariloche → CABA 88,1%, también Ushuaia, Neuquén, Jujuy (~88%). Casi todas son **destinos turísticos conectados a Aeroparque**.
 - Rutas con más pasajeros en 2025: CABA ↔ Córdoba (~730 mil por sentido), CABA ↔ Mendoza, CABA ↔ Bariloche, CABA ↔ Iguazú.
 - Nota: en la base, "Ciudad de Buenos Aires" = Aeroparque y "Ezeiza" aparece aparte. Considerar unificarlos como "Buenos Aires" si se analiza por ciudad.
+
+- ANAC 2025: más pasajeros por vuelo en Bariloche (158), Iguazú (148), Ushuaia (147), Puerto Madryn (145), San Martín de los Andes (144); Aeroparque 133.
+- Aeroparque: 257 vuelos de cabotaje por día, 13-16,5 por hora entre las 9 y las 20 → cuello de botella. Ezeiza tiene picos chicos (~5/hora).
 
 ## Identidad visual (usar en todos los gráficos)
 
@@ -130,7 +137,7 @@ docs/                  # consigna, guía de estilo, logo
 
 ## Próximos pasos
 
-1. Decidir si se suma la base de ANAC (horarios pico por aeropuerto) o se trabaja solo con Turismo.
+1. Confirmar con Julia el uso de la base de ANAC (ya integrada en la sección 5 del script).
 2. Gráficos con matplotlib: evolución anual de pasajeros y LF, estacionalidad mensual, ranking de rutas por LF, matriz volumen vs LF (para detectar rutas candidatas a más frecuencias).
 3. KPIs finales y conclusiones de negocio.
 4. Armar el .zip de entrega.
