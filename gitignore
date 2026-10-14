@@ -1,0 +1,14 @@
+# Datos: el CSV original pesa ~270 MB (GitHub no acepta archivos > 100 MB).
+# El script los descarga solo.
+data/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Sistema / editores
+.DS_Store
+.vscode/
+.idea/
