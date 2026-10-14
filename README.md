@@ -84,4 +84,4 @@ tpo-ofca/
 ## Identidad visual
 
 - **Paleta:** `#F2D565` · `#7BB6D1` · `#93AAB5` · `#272F33`
-- **Tipografías:** Montserrat (principal) y Encode Sans (secundaria)
+- **Tipografías:** Montserrat (principal) y Roboto Mono (secundaria)

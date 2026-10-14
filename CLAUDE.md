@@ -114,7 +114,7 @@ Paleta oficial (de la guía de estilo):
 
 Colores del logo (complementarios): azul marino `#14284B` (títulos, serie fuerte), azul acero `#527D9B`, celeste muy claro `#E7F2F7` (fondos).
 
-Tipografía: **Montserrat** (principal, títulos) y **Encode Sans** (secundaria). En matplotlib usarlas si están instaladas; si no, caer a una sans-serif sin romper el script.
+Tipografía: **Montserrat** (principal, títulos) y **Roboto Mono** (secundaria: datos, números, etiquetas). En matplotlib usarlas si están instaladas; si no, caer a una sans-serif sin romper el script.
 
 Criterios de gráficos: título claro que diga la conclusión, ejes con unidades, sin bordes superiores/derechos, fuente citada abajo ("Fuente: ANAC / Secretaría de Turismo"). Guardar en `graficos/` como PNG (dpi 150+) para usar en la presentación.
 

@@ -191,10 +191,10 @@ LF_BAJO = 75   # LF debajo de esto = sobreoferta
 
 
 def elegir_tipografia():
-    """Usa Montserrat si está instalada; si no, Encode Sans; si no, una sans-serif
+    """Usa Montserrat si está instalada; si no, Roboto Mono; si no, una sans-serif
     común. Así el script nunca se rompe por falta de una fuente."""
     instaladas = {f.name for f in font_manager.fontManager.ttflist}
-    for fuente in ["Montserrat", "Encode Sans"]:
+    for fuente in ["Montserrat", "Roboto Mono"]:
         if fuente in instaladas:
             return fuente
     return "DejaVu Sans"   # viene con matplotlib, siempre está
