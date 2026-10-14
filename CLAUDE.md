@@ -47,7 +47,7 @@ La primera vez descarga el CSV (~270 MB) a `data/`. Después lo reutiliza.
 
 ## Fuentes de datos
 
-### 1. Secretaría de Turismo — Conectividad Aérea (EN USO)
+### 1. Secretaría de Turismo — Conectividad Aérea (EN USO, falta la aprobación de Julia: consulta enviada)
 
 - Dataset: https://datos.yvera.gob.ar/dataset/conectividad-aerea
 - Archivo: `base_microdatos.csv` ("Base agregada de frecuencias aéreas")
@@ -58,7 +58,7 @@ La primera vez descarga el CSV (~270 MB) a `data/`. Después lo reutiliza.
 - **Por qué esta y no la de ANAC:** es la única que trae `asientos`, necesarios para el Load Factor.
 - Advertencia: Turismo filtró vuelos desde/hacia aeropuertos "sin relevancia turística" (ver `novedades.csv` del dataset). Algunos aeropuertos chicos pueden faltar. Mencionarlo en el informe.
 
-### 2. ANAC — Aterrizajes y despegues procesados (EN USO desde oct-2026, falta confirmar aprobación de Julia)
+### 2. ANAC — Aterrizajes y despegues procesados (EN USO, APROBADA por Julia: CSV 2020 a 2026)
 
 - https://datos.gob.ar/dataset/aterrizajes-y-despegues-procesados-por-la-administracion-nacional-de-aviacion-civil-anac
 - Un CSV por año (2019 a 2026). Trae **hora** y aeropuerto de cada movimiento, pasajeros, aeronave, aerolínea. **No trae asientos.**
@@ -137,7 +137,7 @@ docs/                  # consigna, guía de estilo, logo
 
 ## Próximos pasos
 
-1. Confirmar con Julia el uso de la base de ANAC (ya integrada en la sección 5 del script).
+1. Esperar el OK de Julia para la base de Turismo (la de ANAC ya está aprobada). Si no la aprueba, el Load Factor no se puede calcular (ANAC no trae asientos) y hay que replantear las secciones 2 a 4.
 2. Gráficos con matplotlib: evolución anual de pasajeros y LF, estacionalidad mensual, ranking de rutas por LF, matriz volumen vs LF (para detectar rutas candidatas a más frecuencias).
 3. KPIs finales y conclusiones de negocio.
 4. Armar el .zip de entrega.
